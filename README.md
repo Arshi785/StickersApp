@@ -1,5 +1,7 @@
 # Android Stickers Apps for WhatsApp
 
+
+This app is developed by Er.Arshi Sheikh
 ## Overview
 
 If you would like to design your own stickers for WhatsApp, you can package them in an Android app. You will need to distribute your app via the Google Play Store or another mechanism. Users who download and install your sticker app will be able to add your stickers to their WhatsApp sticker picker/tray, and start sending those stickers from within WhatsApp. A separate app is necessary and it will reside on your phone's home screen just like any other app. Stickers on WhatsApp must be legal, authorized, and acceptable. Learn more about acceptable use of our services at https://www.whatsapp.com/legal/#terms-of-service.
@@ -112,70 +114,3 @@ The ContentProvider in the sample app is [StickerContentProvider](app/src/main/j
 3. `<authority>/stickers/<pack_identifier>`, this returns information about the  stickers in a pack. The returned information includes the sticker file name and emoji associated with the sticker.
 4. `<authority>/stickers_asset/<pack_identifier>/<sticker_file_name>`, this returns the binary information of the sticker: `AssetFileDescriptor`, which points to the asset file for the sticker. Replace `<sticker_file_name>` with the actual sticker file name that should be fetched.
 
-The ContentProvider needs to have a read permission of `com.whatsapp.sticker.READ` in `AndroidManifest.xml`. It also needs to be exported and enabled. See below for an example:
-
-        <provider
-            android:name=".StickerContentProvider"
-            android:authorities="${contentProviderAuthority}"
-            android:enabled="true"
-            android:exported="true"
-            android:readPermission="com.whatsapp.sticker.READ" />
-#### Expose files that are stored internally as stickers through ContentProvider
-If you would like to expose files saved internally or externally and serve these files as sticker. It is possible, but please follow the guidelines in 'Sticker art and app requirements' to make sure the files meets these requirements. As to how to do that, you can take a look at the following code snippet to get an understanding of how that can be done. 
-
-        private AssetFileDescriptor fetchFile(@NonNull Uri uri, @NonNull AssetManager am, @NonNull String fileName, @NonNull String identifier) throws IOException {
-        final File cacheFile = getContext().getExternalCacheDir();
-        final File file = new File(cacheFile, fileName);
-        try (final InputStream open = am.open(identifier + "/" + fileName);
-             final FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-             byte[] buffer = new byte[1024];
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                out.write(buffer, 0, read);
-            }
-        }
-        //The code above is basically copying the assets to storage, and servering the file off of the storage. 
-        //If you have the files already downloaded/fetched, you could simply replace above part, and initialize the file parameter with your own file which points to the desired file.
-        //The key here is you can use ParcelFileDescriptor to create an AssetFileDescriptor.
-        return new AssetFileDescriptor(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY), 0, AssetFileDescriptor.UNKNOWN_LENGTH);
-    }
-
-### Intent
-It is required that users explicitly add a sticker pack to WhatsApp, so your app must provide a UI element to allow users to add a pack (for example, a button labeled "Add to WhatsApp" as in the sample app). 
-In the sample app, both [StickerPackListActivity](app/src/main/java/com/example/samplestickerapp/StickerPackListActivity.java) and [StickerPackDetailsActivity](app/src/main/java/com/example/samplestickerapp/StickerPackDetailsActivity.java) contains code to launch the intent after the user presses the Add to WhatsApp button. The user must then confirm they want to add the pack via the alert box presented by WhatsApp.
-
-        Intent intent = new Intent();
-        intent.setAction("com.whatsapp.intent.action.ENABLE_STICKER_PACK");
-        intent.putExtra("sticker_pack_id", identifier); //identifier is the pack's identifier in contents.json file
-        intent.putExtra("sticker_pack_authority", authority); //authority is the ContentProvider's authority. In the case of the sample app it is BuildConfig.CONTENT_PROVIDER_AUTHORITY.
-        intent.putExtra("sticker_pack_name", stickerPackName); //stickerPackName is the name of the sticker pack.
-        try {
-            startActivityForResult(intent, 200);
-        } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, R.string.error_adding_sticker_pack, Toast.LENGTH_LONG).show();
-        }
-
-### Check if pack is added (optional)
-Sticker apps can check to see if a sticker pack it provides has been added to WhatsApp by the user. This is useful if you'd like to display different UI to users. For example if the pack is not added, you should present a button to add it to WhatsApp, but if the pack is added, you can remove the add button and inform the user the pack is already added to WhatsApp.
-
-A `ContentProvider` provides information to sticker apps on whether an app is added to WhatsApp or not. This provider authority is `com.whatsapp.provider.sticker_whitelist_check` for the WhatsApp consumer app; `com.whatsapp.w4b.provider.sticker_whitelist_check` for the WhatsApp Business app. 
-
-In order to query this ContentProvider, you need to provide the following query:
-`content://com.whatsapp.provider.sticker_whitelist_check/is_whitelisted?authority='replace with authority of your sticker content provider'&identifier='replace with identifier of the pack'`
-
-The result is in a row corresponding to the column named `result`. The value will be either `0`, meaning the pack is not added to WhatsApp, or `1`, meaning the pack has been added. If the returned result is null, the query was invalid or the version of WhatsApp installed by the user is too old to support stickers. See the class in the sample app: [WhitelistCheck](app/src/main/java/com/example/samplestickerapp/WhitelistCheck.java). This class provides ways to do the query. You can call `WhitelistCheck.isWhitelisted(Context context, String identifier)`. The identifier should match the identifier of the pack you want to query. The authority is automatically filled in as the authority of your sticker app's ContentProvider.
-
-Note that a pack can be added to either the main WhatsApp app, WhatsApp Business, or both. It is recommended you continue to present a button to add the pack to WhatsApp if the sticker pack is not added to one or more of the apps. Refer to the class [WhitelistCheck](app/src/main/java/com/example/samplestickerapp/WhitelistCheck.java) for sample logic.
-
-Your app can only query whether the packs it provides have been added and it can't check for information about sticker packs from other apps.
-
-### Update image data version
-In a recent update, image data version (image_data_version in contents.json) was introduced, this is a way to tell WhatsApp whether your app has new content or not.
-
-If you update your stickers, add new stickers to a pack, you should update this value.
-
-If your app allows users to add/update/delete stickers from a pack, you should update the value after users have made changes.
-
-
-### Emoji list to use for tagging
-Please see https://github.com/WhatsApp/stickers/wiki/Tag-your-stickers-with-Emojis
